@@ -214,9 +214,14 @@ export default function ControleFinanceiroMarciel() {
     }));
   }
 
-  const detailedExpensesTotal = data.detailedExpenses.reduce((sum, item) => sum + Number(item.value || 0), 0);
-  const detailedFixedAccountsTotal = data.fixedAccounts.reduce((sum, item) => sum + Number(item.value || 0), 0);
-  const totalFixedAccountsSpent = data.fixedAccounts.reduce((sum, item) => sum + Number(item.spent || 0), 0);
+  const fixedAccounts = Array.isArray(data.fixedAccounts) ? data.fixedAccounts : [];
+  const detailedExpenses = Array.isArray(data.detailedExpenses) ? data.detailedExpenses : [];
+  const piggyBanks = data.piggyBanks && typeof data.piggyBanks === "object" ? data.piggyBanks : {};
+  const piggyBankChecks = data.piggyBankChecks && typeof data.piggyBankChecks === "object" ? data.piggyBankChecks : {};
+
+  const detailedExpensesTotal = detailedExpenses.reduce((sum, item) => sum + Number(item.value || 0), 0);
+  const detailedFixedAccountsTotal = fixedAccounts.reduce((sum, item) => sum + Number(item.value || 0), 0);
+  const totalFixedAccountsSpent = fixedAccounts.reduce((sum, item) => sum + Number(item.spent || 0), 0);
   const totalFixedAccountsRemaining = Math.max(0, detailedFixedAccountsTotal - totalFixedAccountsSpent);
 
   const weeklyFlexible = Number(data.weeklyPlan.vida || 0) + Number(data.weeklyPlan.diversao || 0);
@@ -243,42 +248,42 @@ export default function ControleFinanceiroMarciel() {
   const contasShortfallWeekly = round2(Math.max(0, suggestedWeeklyContas - Number(data.weeklyPlan.contas || 0)));
 
   const monthlyInvestment = Number(data.weeklyPlan.investimento || 0) * WEEKS_PER_MONTH;
-  const totalPiggyBanks = Object.values(data.piggyBanks || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+  const totalPiggyBanks = Object.values(piggyBanks).reduce((sum, value) => sum + Number(value || 0), 0);
   const recommendedContasBuffer = round2(totalSimulatedExpenses * 0.2);
-  const piggyContasGap = round2(totalSimulatedExpenses - Number(data.piggyBanks.contas || 0));
-  const piggyInvestimentoMonthlyGap = round2(monthlyInvestment - Number(data.piggyBanks.investimento || 0));
+  const piggyContasGap = round2(totalSimulatedExpenses - Number(piggyBanks.contas || 0));
+  const piggyInvestimentoMonthlyGap = round2(monthlyInvestment - Number(piggyBanks.investimento || 0));
 
   const contasPiggyStatus =
-    Number(data.piggyBanks.contas || 0) >= totalSimulatedExpenses
+    Number(piggyBanks.contas || 0) >= totalSimulatedExpenses
       ? "Coberto"
-      : Number(data.piggyBanks.contas || 0) >= totalSimulatedExpenses * 0.7
+      : Number(piggyBanks.contas || 0) >= totalSimulatedExpenses * 0.7
         ? "Atenção"
         : "Crítico";
 
   const investimentoPiggyStatus =
-    Number(data.piggyBanks.investimento || 0) >= monthlyInvestment * 3
+    Number(piggyBanks.investimento || 0) >= monthlyInvestment * 3
       ? "Forte"
-      : Number(data.piggyBanks.investimento || 0) >= monthlyInvestment
+      : Number(piggyBanks.investimento || 0) >= monthlyInvestment
         ? "Ok"
         : "Fraco";
 
   const intelligentAlerts = useMemo(() => {
     return [
-      Number(data.piggyBanks.contas || 0) < totalSimulatedExpenses
+      Number(piggyBanks.contas || 0) < totalSimulatedExpenses
         ? {
-            type: Number(data.piggyBanks.contas || 0) < totalSimulatedExpenses * 0.7 ? "critical" : "warning",
+            type: Number(piggyBanks.contas || 0) < totalSimulatedExpenses * 0.7 ? "critical" : "warning",
             title: "Cofrinho de contas abaixo do necessário",
             message: `Faltam ${currency(Math.max(0, piggyContasGap))} para cobrir 1 mês completo de contas.`,
           }
         : null,
-      Number(data.piggyBanks.contas || 0) >= totalSimulatedExpenses && Number(data.piggyBanks.contas || 0) < totalSimulatedExpenses + recommendedContasBuffer
+      Number(piggyBanks.contas || 0) >= totalSimulatedExpenses && Number(piggyBanks.contas || 0) < totalSimulatedExpenses + recommendedContasBuffer
         ? {
             type: "info",
             title: "Cofrinho de contas coberto, mas sem folga",
             message: `Seu colchão ideal para contas seria pelo menos ${currency(recommendedContasBuffer)} além do valor mensal.`,
           }
         : null,
-      Number(data.piggyBanks.investimento || 0) < monthlyInvestment
+      Number(piggyBanks.investimento || 0) < monthlyInvestment
         ? {
             type: "warning",
             title: "Cofrinho de investimento fraco para o ritmo atual",
@@ -286,7 +291,7 @@ export default function ControleFinanceiroMarciel() {
           }
         : null,
     ].filter(Boolean);
-  }, [data.piggyBanks, totalSimulatedExpenses, piggyContasGap, recommendedContasBuffer, monthlyInvestment, piggyInvestimentoMonthlyGap]);
+  }, [piggyBanks, totalSimulatedExpenses, piggyContasGap, recommendedContasBuffer, monthlyInvestment, piggyInvestimentoMonthlyGap]);
 
   function applySuggestedContasAdjustment() {
     const neededWeeklyContas = round2(totalSimulatedExpenses / WEEKS_PER_MONTH);
@@ -317,32 +322,32 @@ export default function ControleFinanceiroMarciel() {
     contas: {
       weekly: Number(data.weeklyPlan.contas || 0),
       monthly: round2(Number(data.weeklyPlan.contas || 0) * WEEKS_PER_MONTH),
-      current: Number(data.piggyBanks.contas || 0),
+      current: Number(piggyBanks.contas || 0),
     },
     saude: {
       weekly: Number(data.weeklyPlan.saude || 0),
       monthly: round2(Number(data.weeklyPlan.saude || 0) * WEEKS_PER_MONTH),
-      current: Number(data.piggyBanks.saude || 0),
+      current: Number(piggyBanks.saude || 0),
     },
     investimento: {
       weekly: Number(data.weeklyPlan.investimento || 0),
       monthly: round2(Number(data.weeklyPlan.investimento || 0) * WEEKS_PER_MONTH),
-      current: Number(data.piggyBanks.investimento || 0),
+      current: Number(piggyBanks.investimento || 0),
     },
     vida: {
       weekly: Number(data.weeklyPlan.vida || 0),
       monthly: round2(Number(data.weeklyPlan.vida || 0) * WEEKS_PER_MONTH),
-      current: Number(data.piggyBanks.vida || 0),
+      current: Number(piggyBanks.vida || 0),
     },
     diversao: {
       weekly: Number(data.weeklyPlan.diversao || 0),
       monthly: round2(Number(data.weeklyPlan.diversao || 0) * WEEKS_PER_MONTH),
-      current: Number(data.piggyBanks.diversao || 0),
+      current: Number(piggyBanks.diversao || 0),
     },
     seguranca: {
       weekly: Number(data.weeklyPlan.seguranca || 0),
       monthly: round2(Number(data.weeklyPlan.seguranca || 0) * WEEKS_PER_MONTH),
-      current: Number(data.piggyBanks.seguranca || 0),
+      current: Number(piggyBanks.seguranca || 0),
     },
   };
 
@@ -403,7 +408,7 @@ export default function ControleFinanceiroMarciel() {
             </Section>
 
             <Section title="Gastos recentes" id="quick-gastos">
-              {data.detailedExpenses.length === 0 ? (
+              {detailedExpenses.length === 0 ? (
                 <div style={{ color: "#64748b", fontSize: 14 }}>Nenhum gasto ainda.</div>
               ) : (
                 <div style={{ display: "grid", gap: 10 }}>
@@ -526,11 +531,11 @@ export default function ControleFinanceiroMarciel() {
             </Section>
 
             <Section title="Contas Fixas Detalhadas" id="full-contas">
-              {data.fixedAccounts.length === 0 ? (
+              {fixedAccounts.length === 0 ? (
                 <div style={{ color: "#64748b", fontSize: 14 }}>Nenhuma conta fixa cadastrada.</div>
               ) : (
                 <div style={{ display: "grid", gap: 10 }}>
-                  {data.fixedAccounts.map((account) => (
+                  {fixedAccounts.map((account) => (
                     <div key={account.id} style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", border: "1px solid #e2e8f0", borderRadius: 14, background: "#fff", padding: 12 }}>
                       <div>
                         <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>Nome da conta</div>
@@ -556,11 +561,11 @@ export default function ControleFinanceiroMarciel() {
             </Section>
 
             <Section title="Gastos Detalhados" id="full-gastos">
-              {data.detailedExpenses.length === 0 ? (
+              {detailedExpenses.length === 0 ? (
                 <div style={{ color: "#64748b", fontSize: 14 }}>Nenhum gasto detalhado adicionado.</div>
               ) : (
                 <div style={{ display: "grid", gap: 10 }}>
-                  {data.detailedExpenses.map((expense) => (
+                  {detailedExpenses.map((expense) => (
                     <div key={expense.id} style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", border: "1px solid #e2e8f0", borderRadius: 14, background: "#fff", padding: 12 }}>
                       <div>
                         <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>Nome do gasto</div>
@@ -607,19 +612,19 @@ export default function ControleFinanceiroMarciel() {
 
             <Section title="Visão dos Cofrinhos" id="full-cofrinhos">
               <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
-                {Object.entries(data.piggyBanks).map(([k, v]) => (
+                {Object.entries(piggyBanks).map(([k, v]) => (
                   <div key={k} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 10 }}>
                       <div style={{ fontSize: 14, color: "#64748b", textTransform: "capitalize" }}>{k}</div>
                       <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: "#64748b" }}>
-                        <input type="checkbox" checked={Boolean(data.piggyBankChecks?.[k])} onChange={(e) => update(`piggyBankChecks.${k}`, e.target.checked)} />
+                        <input type="checkbox" checked={Boolean(piggyBankChecks?.[k])} onChange={(e) => update(`piggyBankChecks.${k}`, e.target.checked)} />
                         Atualizado
                       </label>
                     </div>
                     <input type="number" min="0" style={inputStyle()} value={v} onChange={(e) => update(`piggyBanks.${k}`, Number(e.target.value))} />
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 10 }}>
                       <div style={{ fontWeight: 700 }}>{currency(v)}</div>
-                      <div style={{ padding: "6px 10px", borderRadius: 999, background: "#e2e8f0", fontSize: 12, fontWeight: 700 }}>{data.piggyBankChecks?.[k] ? "Conferido" : "Pendente"}</div>
+                      <div style={{ padding: "6px 10px", borderRadius: 999, background: "#e2e8f0", fontSize: 12, fontWeight: 700 }}>{piggyBankChecks?.[k] ? "Conferido" : "Pendente"}</div>
                     </div>
                   </div>
                 ))}
