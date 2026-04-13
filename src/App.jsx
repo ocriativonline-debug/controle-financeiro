@@ -1,11 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 
-const STORAGE_KEY = "controle_financeiro_marciel_v18";
+const STORAGE_KEY = "controle_financeiro_marciel_v19";
 const WEEKS_PER_MONTH = 4.33;
 
 const defaultState = {
@@ -67,30 +62,61 @@ function round2(value) {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 }
 
-function alertBoxClass(type) {
-  if (type === "critical") return "border-red-200 bg-red-50";
-  if (type === "warning") return "border-yellow-200 bg-yellow-50";
-  if (type === "success") return "border-green-200 bg-green-50";
-  return "border-blue-200 bg-blue-50";
+function clone(obj) {
+  return JSON.parse(JSON.stringify(obj));
 }
 
-function alertTitleClass(type) {
-  if (type === "critical") return "text-red-700";
-  if (type === "warning") return "text-yellow-800";
-  if (type === "success") return "text-green-700";
-  return "text-blue-700";
+function cardStyle() {
+  return {
+    background: "#fff",
+    border: "1px solid #e2e8f0",
+    borderRadius: 16,
+    padding: 16,
+    boxShadow: "0 8px 24px rgba(15,23,42,0.06)",
+  };
 }
 
-function SectionCard({ title, children, id }) {
+function inputStyle() {
+  return {
+    width: "100%",
+    minHeight: 42,
+    border: "1px solid #cbd5e1",
+    borderRadius: 10,
+    padding: "10px 12px",
+    fontSize: 14,
+    boxSizing: "border-box",
+    background: "#fff",
+  };
+}
+
+function buttonStyle(primary = true) {
+  return {
+    minHeight: 42,
+    borderRadius: 10,
+    padding: "10px 14px",
+    border: primary ? "none" : "1px solid #cbd5e1",
+    background: primary ? "#2563eb" : "#fff",
+    color: primary ? "#fff" : "#0f172a",
+    cursor: "pointer",
+    fontWeight: 600,
+  };
+}
+
+function Section({ title, children, id }) {
   return (
-    <section id={id} className="space-y-0">
-      <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">{children}</CardContent>
-      </Card>
+    <section id={id} style={cardStyle()}>
+      <h2 style={{ margin: 0, marginBottom: 16, fontSize: 22 }}>{title}</h2>
+      <div style={{ display: "grid", gap: 14 }}>{children}</div>
     </section>
+  );
+}
+
+function StatBox({ label, value, color }) {
+  return (
+    <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14 }}>
+      <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>{label}</div>
+      <div style={{ fontWeight: 700, fontSize: 20, color: color || "#0f172a" }}>{value}</div>
+    </div>
   );
 }
 
@@ -124,19 +150,21 @@ export default function ControleFinanceiroMarciel() {
   }, []);
 
   useEffect(() => {
-    if (loaded) localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    if (loaded) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
   }, [data, loaded]);
 
   function update(path, value) {
     setData((prev) => {
-      const clone = structuredClone(prev);
+      const next = clone(prev);
       const keys = path.split(".");
-      let obj = clone;
+      let obj = next;
       keys.slice(0, -1).forEach((k) => {
         obj = obj[k];
       });
       obj[keys[keys.length - 1]] = value;
-      return clone;
+      return next;
     });
   }
 
@@ -161,11 +189,20 @@ export default function ControleFinanceiroMarciel() {
     }));
   }
 
+  function updateFixedAccount(id, field, value) {
+    setData((prev) => ({
+      ...prev,
+      fixedAccounts: prev.fixedAccounts.map((item) =>
+        item.id === id ? { ...item, [field]: value } : item
+      ),
+    }));
+  }
+
   function updateDetailedExpense(id, field, value) {
     setData((prev) => ({
       ...prev,
-      detailedExpenses: prev.detailedExpenses.map((expense) =>
-        expense.id === id ? { ...expense, [field]: value } : expense
+      detailedExpenses: prev.detailedExpenses.map((item) =>
+        item.id === id ? { ...item, [field]: value } : item
       ),
     }));
   }
@@ -173,31 +210,13 @@ export default function ControleFinanceiroMarciel() {
   function removeDetailedExpense(id) {
     setData((prev) => ({
       ...prev,
-      detailedExpenses: prev.detailedExpenses.filter((expense) => expense.id !== id),
+      detailedExpenses: prev.detailedExpenses.filter((item) => item.id !== id),
     }));
   }
 
-  function updateFixedAccount(id, field, value) {
-    setData((prev) => ({
-      ...prev,
-      fixedAccounts: prev.fixedAccounts.map((account) =>
-        account.id === id ? { ...account, [field]: value } : account
-      ),
-    }));
-  }
-
-  const detailedExpensesTotal = data.detailedExpenses.reduce(
-    (sum, expense) => sum + Number(expense.value || 0),
-    0
-  );
-  const detailedFixedAccountsTotal = data.fixedAccounts.reduce(
-    (sum, account) => sum + Number(account.value || 0),
-    0
-  );
-  const totalFixedAccountsSpent = data.fixedAccounts.reduce(
-    (sum, account) => sum + Number(account.spent || 0),
-    0
-  );
+  const detailedExpensesTotal = data.detailedExpenses.reduce((sum, item) => sum + Number(item.value || 0), 0);
+  const detailedFixedAccountsTotal = data.fixedAccounts.reduce((sum, item) => sum + Number(item.value || 0), 0);
+  const totalFixedAccountsSpent = data.fixedAccounts.reduce((sum, item) => sum + Number(item.spent || 0), 0);
   const totalFixedAccountsRemaining = Math.max(0, detailedFixedAccountsTotal - totalFixedAccountsSpent);
 
   const weeklyFlexible = Number(data.weeklyPlan.vida || 0) + Number(data.weeklyPlan.diversao || 0);
@@ -224,11 +243,7 @@ export default function ControleFinanceiroMarciel() {
   const contasShortfallWeekly = round2(Math.max(0, suggestedWeeklyContas - Number(data.weeklyPlan.contas || 0)));
 
   const monthlyInvestment = Number(data.weeklyPlan.investimento || 0) * WEEKS_PER_MONTH;
-  const totalPiggyBanks = Object.values(data.piggyBanks || {}).reduce(
-    (sum, value) => sum + Number(value || 0),
-    0
-  );
-
+  const totalPiggyBanks = Object.values(data.piggyBanks || {}).reduce((sum, value) => sum + Number(value || 0), 0);
   const recommendedContasBuffer = round2(totalSimulatedExpenses * 0.2);
   const piggyContasGap = round2(totalSimulatedExpenses - Number(data.piggyBanks.contas || 0));
   const piggyInvestimentoMonthlyGap = round2(monthlyInvestment - Number(data.piggyBanks.investimento || 0));
@@ -256,8 +271,7 @@ export default function ControleFinanceiroMarciel() {
             message: `Faltam ${currency(Math.max(0, piggyContasGap))} para cobrir 1 mês completo de contas.`,
           }
         : null,
-      Number(data.piggyBanks.contas || 0) >= totalSimulatedExpenses &&
-      Number(data.piggyBanks.contas || 0) < totalSimulatedExpenses + recommendedContasBuffer
+      Number(data.piggyBanks.contas || 0) >= totalSimulatedExpenses && Number(data.piggyBanks.contas || 0) < totalSimulatedExpenses + recommendedContasBuffer
         ? {
             type: "info",
             title: "Cofrinho de contas coberto, mas sem folga",
@@ -271,13 +285,6 @@ export default function ControleFinanceiroMarciel() {
             message: `Ele está ${currency(Math.max(0, piggyInvestimentoMonthlyGap))} abaixo de 1 mês do seu próprio aporte planejado.`,
           }
         : null,
-      Number(data.piggyBanks.investimento || 0) >= monthlyInvestment * 3
-        ? {
-            type: "success",
-            title: "Cofrinho de investimento em nível saudável",
-            message: "Você já acumulou pelo menos 3 meses do seu aporte mensal planejado.",
-          }
-        : null,
     ].filter(Boolean);
   }, [data.piggyBanks, totalSimulatedExpenses, piggyContasGap, recommendedContasBuffer, monthlyInvestment, piggyInvestimentoMonthlyGap]);
 
@@ -288,21 +295,21 @@ export default function ControleFinanceiroMarciel() {
     if (delta <= 0) return;
 
     setData((prev) => {
-      const clone = structuredClone(prev);
-      clone.weeklyPlan.contas = neededWeeklyContas;
+      const next = clone(prev);
+      next.weeklyPlan.contas = neededWeeklyContas;
       let remaining = delta;
       const adjustableFields = ["diversao", "seguranca", "vida", "saude"];
       adjustableFields.forEach((field) => {
         if (remaining <= 0) return;
-        const currentValue = Number(clone.weeklyPlan[field] || 0);
+        const currentValue = Number(next.weeklyPlan[field] || 0);
         const reduction = Math.min(currentValue, remaining);
-        clone.weeklyPlan[field] = round2(currentValue - reduction);
+        next.weeklyPlan[field] = round2(currentValue - reduction);
         remaining = round2(remaining - reduction);
       });
       if (remaining > 0) {
-        clone.weeklyPlan.investimento = round2(Math.max(0, Number(clone.weeklyPlan.investimento || 0) - remaining));
+        next.weeklyPlan.investimento = round2(Math.max(0, Number(next.weeklyPlan.investimento || 0) - remaining));
       }
-      return clone;
+      return next;
     });
   }
 
@@ -349,421 +356,304 @@ export default function ControleFinanceiroMarciel() {
   );
 
   return (
-    <div className="space-y-4 p-4 pb-24 md:space-y-6 md:p-6">
-      <div className="flex items-center justify-between gap-3 rounded-xl border bg-white p-3 md:p-4">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-slate-500">Controle Financeiro</p>
-          <h1 className="text-xl font-bold md:text-2xl">Marciel</h1>
+    <div style={{ background: "#f8fafc", minHeight: "100vh", padding: 16, paddingBottom: 90, color: "#0f172a" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gap: 16 }}>
+        <div style={{ ...cardStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: 12, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.6 }}>Controle Financeiro</div>
+            <div style={{ fontSize: 28, fontWeight: 700 }}>Marciel</div>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button style={buttonStyle(data.mode === "quick")} onClick={() => update("mode", "quick")}>Rápido</button>
+            <button style={buttonStyle(data.mode === "full")} onClick={() => update("mode", "full")}>Completo</button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant={data.mode === "quick" ? "default" : "outline"} onClick={() => update("mode", "quick")}>Rápido</Button>
-          <Button variant={data.mode === "full" ? "default" : "outline"} onClick={() => update("mode", "full")}>Completo</Button>
-        </div>
-      </div>
 
-      {data.mode === "quick" && (
-        <>
-          <SectionCard title="Lançamento rápido" id="quick-top">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div className="space-y-2">
-                <Label>Natureza</Label>
-                <select
-                  className="w-full rounded-md border bg-white px-3 py-2"
-                  value={data.entryDraft.type}
-                  onChange={(e) => update("entryDraft.type", e.target.value)}
-                >
-                  <option value="expense">Gasto</option>
-                  <option value="fixed">Conta Fixa</option>
-                </select>
+        {data.mode === "quick" && (
+          <>
+            <Section title="Lançamento rápido" id="quick-top">
+              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                <div>
+                  <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>Natureza</div>
+                  <select style={inputStyle()} value={data.entryDraft.type} onChange={(e) => update("entryDraft.type", e.target.value)}>
+                    <option value="expense">Gasto</option>
+                    <option value="fixed">Conta Fixa</option>
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>{data.entryDraft.type === "fixed" ? "Nome da conta" : "Nome do gasto"}</div>
+                  <input style={inputStyle()} value={data.entryDraft.name} onChange={(e) => update("entryDraft.name", e.target.value)} placeholder={data.entryDraft.type === "fixed" ? "Ex.: Internet" : "Ex.: Café"} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>Valor</div>
+                  <input type="number" min="0" style={inputStyle()} value={data.entryDraft.value} onChange={(e) => update("entryDraft.value", Number(e.target.value))} />
+                </div>
               </div>
-              <div className="space-y-2 md:col-span-1">
-                <Label>{data.entryDraft.type === "fixed" ? "Nome da conta" : "Nome do gasto"}</Label>
-                <Input
-                  type="text"
-                  value={data.entryDraft.name}
-                  onChange={(e) => update("entryDraft.name", e.target.value)}
-                  placeholder={data.entryDraft.type === "fixed" ? "Ex.: Internet" : "Ex.: Café"}
-                />
+              <div>
+                <button style={{ ...buttonStyle(true), width: "100%" }} onClick={addEntry}>Salvar lançamento</button>
               </div>
-              <div className="space-y-2">
-                <Label>Valor</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={data.entryDraft.value}
-                  onChange={(e) => update("entryDraft.value", Number(e.target.value))}
-                />
-              </div>
-            </div>
-            <Button className="w-full md:w-auto" onClick={addEntry}>Salvar lançamento</Button>
-          </SectionCard>
+            </Section>
 
-          <SectionCard title="Resumo rápido">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div className="rounded-xl bg-slate-100 p-4">
-                <p className="text-sm text-slate-600">Gasto total detalhado</p>
-                <p className="text-2xl font-bold text-red-600">{currency(detailedExpensesTotal)}</p>
+            <Section title="Resumo rápido">
+              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                <StatBox label="Gasto total detalhado" value={currency(detailedExpensesTotal)} color="#dc2626" />
+                <StatBox label="Gasto efetivo da semana" value={currency(effectiveSpentSoFar)} />
+                <StatBox label="Disponível hoje" value={currency(allowedToday)} color="#2563eb" />
               </div>
-              <div className="rounded-xl bg-slate-100 p-4">
-                <p className="text-sm text-slate-600">Gasto efetivo da semana</p>
-                <p className="text-2xl font-bold">{currency(effectiveSpentSoFar)}</p>
-              </div>
-              <div className="rounded-xl bg-slate-100 p-4">
-                <p className="text-sm text-slate-600">Disponível hoje</p>
-                <p className="text-2xl font-bold text-blue-700">{currency(allowedToday)}</p>
-              </div>
-            </div>
-          </SectionCard>
+            </Section>
 
-          <SectionCard title="Gastos recentes" id="quick-gastos">
-            {data.detailedExpenses.length === 0 ? (
-              <p className="text-sm text-slate-500">Nenhum gasto ainda.</p>
-            ) : (
-              <div className="space-y-2">
-                {[...data.detailedExpenses].slice(-10).reverse().map((expense) => (
-                  <div key={expense.id} className="flex items-center justify-between rounded-xl border bg-white p-3">
-                    <div>
-                      <p className="font-medium">{expense.name}</p>
+            <Section title="Gastos recentes" id="quick-gastos">
+              {data.detailedExpenses.length === 0 ? (
+                <div style={{ color: "#64748b", fontSize: 14 }}>Nenhum gasto ainda.</div>
+              ) : (
+                <div style={{ display: "grid", gap: 10 }}>
+                  {[...data.detailedExpenses].slice(-10).reverse().map((expense) => (
+                    <div key={expense.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, background: "#fff" }}>
+                      <div style={{ fontWeight: 500 }}>{expense.name}</div>
+                      <div style={{ fontWeight: 700, color: "#dc2626" }}>{currency(expense.value)}</div>
                     </div>
-                    <p className="font-bold text-red-600">{currency(expense.value)}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </SectionCard>
+                  ))}
+                </div>
+              )}
+            </Section>
+          </>
+        )}
 
-          <div className="fixed bottom-0 left-0 right-0 border-t bg-white/95 p-3 backdrop-blur md:hidden">
-            <div className="flex gap-2">
-              <Button className="flex-1" variant="outline" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>Topo</Button>
-              <Button className="flex-1" onClick={addEntry}>Salvar</Button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {data.mode === "full" && (
-        <>
-          <div className="flex gap-2 overflow-x-auto rounded-xl border bg-white p-2 text-sm">
-            <a href="#full-visao" className="whitespace-nowrap rounded-lg px-3 py-2 hover:bg-slate-100">Visão</a>
-            <a href="#full-semana" className="whitespace-nowrap rounded-lg px-3 py-2 hover:bg-slate-100">Semana</a>
-            <a href="#full-parcelas" className="whitespace-nowrap rounded-lg px-3 py-2 hover:bg-slate-100">Parcelas</a>
-            <a href="#full-contas" className="whitespace-nowrap rounded-lg px-3 py-2 hover:bg-slate-100">Contas</a>
-            <a href="#full-gastos" className="whitespace-nowrap rounded-lg px-3 py-2 hover:bg-slate-100">Gastos</a>
-            <a href="#full-alertas" className="whitespace-nowrap rounded-lg px-3 py-2 hover:bg-slate-100">Alertas</a>
-            <a href="#full-cofrinhos" className="whitespace-nowrap rounded-lg px-3 py-2 hover:bg-slate-100">Cofrinhos</a>
-          </div>
-
-          <SectionCard title="Visão Geral" id="full-visao">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div className="rounded-xl bg-slate-100 p-4">
-                <p>Contas mensais</p>
-                <p className="font-bold">{currency(totalSimulatedExpenses)}</p>
-              </div>
-              <div className="rounded-xl bg-slate-100 p-4">
-                <p>Você separa</p>
-                <p className="font-bold">{currency(monthlyPlanContas)}</p>
-              </div>
-              <div className="rounded-xl bg-slate-100 p-4">
-                <p>Status</p>
-                <Badge>{contasCoverage >= 100 ? "Seguro" : "Risco"}</Badge>
-              </div>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Controle da Semana" id="full-semana">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Dias passados</Label>
-                <Input type="number" min="0" max="7" value={data.daysPassed} onChange={(e) => update("daysPassed", Number(e.target.value))} />
-              </div>
-              <div className="space-y-2">
-                <Label>Gasto na semana</Label>
-                <Input type="number" min="0" value={data.spentSoFar} onChange={(e) => update("spentSoFar", Number(e.target.value))} />
-              </div>
+        {data.mode === "full" && (
+          <>
+            <div style={{ ...cardStyle(), display: "flex", gap: 8, overflowX: "auto", whiteSpace: "nowrap" }}>
+              {[
+                ["Visão", "full-visao"],
+                ["Semana", "full-semana"],
+                ["Parcelas", "full-parcelas"],
+                ["Lançar", "full-lancar"],
+                ["Contas", "full-contas"],
+                ["Gastos", "full-gastos"],
+                ["Alertas", "full-alertas"],
+                ["Cofrinhos", "full-cofrinhos"],
+              ].map(([label, id]) => (
+                <a key={id} href={`#${id}`} style={{ padding: "10px 12px", borderRadius: 10, textDecoration: "none", color: "#0f172a", background: "#f8fafc", border: "1px solid #e2e8f0" }}>{label}</a>
+              ))}
             </div>
 
-            <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
-              <div>
-                <p className="text-slate-600">Limite semanal</p>
-                <p className="font-semibold">{currency(weeklyFlexible)}</p>
+            <Section title="Visão Geral" id="full-visao">
+              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                <StatBox label="Contas mensais" value={currency(totalSimulatedExpenses)} />
+                <StatBox label="Você separa" value={currency(monthlyPlanContas)} />
+                <StatBox label="Status" value={contasCoverage >= 100 ? "Seguro" : "Risco"} />
               </div>
-              <div>
-                <p className="text-slate-600">Limite por dia</p>
-                <p className="font-semibold">{currency(dailyLimit)}</p>
-              </div>
-              <div>
-                <p className="text-slate-600">Ideal até agora</p>
-                <p className="font-semibold">{currency(idealSpent)}</p>
-              </div>
-              <div>
-                <p className="text-slate-600">Diferença</p>
-                <p className={difference > 0 ? "font-semibold text-red-600" : "font-semibold text-green-600"}>{currency(difference)}</p>
-              </div>
-            </div>
+            </Section>
 
-            <div>
-              <p className="mb-2 text-sm text-slate-600">Status da semana</p>
-              <Badge>{weeklyStatus}</Badge>
-            </div>
-
-            <div className="rounded-xl bg-slate-100 p-4">
-              <p className="text-sm text-slate-600">Disponível na semana (Vida diária + Diversão)</p>
-              <p className="text-2xl font-bold text-blue-700">{currency(allowedToday)}</p>
-              <p className="mt-3 text-sm text-slate-600">Restante da semana</p>
-              <p className="font-semibold">{currency(remainingWeek)}</p>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Simulador de Parcelas" id="full-parcelas">
-            <div className="space-y-2">
-              <Label>Nova parcela mensal</Label>
-              <Input type="number" min="0" value={data.simulatedInstallment} onChange={(e) => update("simulatedInstallment", Number(e.target.value))} />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
-              <div>
-                <p className="text-slate-600">Contas mensais atuais</p>
-                <p className="font-semibold">{currency(totalFixedExpenses)}</p>
+            <Section title="Controle da Semana" id="full-semana">
+              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                <div>
+                  <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>Dias passados</div>
+                  <input type="number" min="0" max="7" style={inputStyle()} value={data.daysPassed} onChange={(e) => update("daysPassed", Number(e.target.value))} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>Gasto na semana</div>
+                  <input type="number" min="0" style={inputStyle()} value={data.spentSoFar} onChange={(e) => update("spentSoFar", Number(e.target.value))} />
+                </div>
               </div>
-              <div>
-                <p className="text-slate-600">Nova parcela simulada</p>
-                <p className="font-semibold">{currency(data.simulatedInstallment)}</p>
+              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                <StatBox label="Limite semanal" value={currency(weeklyFlexible)} />
+                <StatBox label="Limite por dia" value={currency(dailyLimit)} />
+                <StatBox label="Ideal até agora" value={currency(idealSpent)} />
+                <StatBox label="Diferença" value={currency(difference)} color={difference > 0 ? "#dc2626" : "#16a34a"} />
               </div>
-              <div>
-                <p className="text-slate-600">Novo total de contas</p>
-                <p className="font-semibold">{currency(totalSimulatedExpenses)}</p>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <span style={{ fontSize: 14, color: "#64748b" }}>Status da semana</span>
+                <span style={{ padding: "6px 10px", borderRadius: 999, background: "#e2e8f0", fontSize: 12, fontWeight: 700 }}>{weeklyStatus}</span>
               </div>
-              <div>
-                <p className="text-slate-600">Você separa por mês</p>
-                <p className="font-semibold">{currency(monthlyPlanContas)}</p>
+              <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 14, padding: 14 }}>
+                <div style={{ fontSize: 13, color: "#64748b" }}>Disponível na semana (Vida diária + Diversão)</div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: "#2563eb", marginTop: 6 }}>{currency(allowedToday)}</div>
+                <div style={{ marginTop: 10, color: "#64748b", fontSize: 14 }}>Restante da semana: {currency(remainingWeek)}</div>
               </div>
-            </div>
+            </Section>
 
-            <div className="rounded-xl bg-slate-100 p-4 space-y-3">
+            <Section title="Simulador de Parcelas" id="full-parcelas">
               <div>
-                <p className="text-sm text-slate-600">Impacto da simulação</p>
-                <p className="mt-1 font-semibold">Cobertura das contas: {round2(contasCoverage).toFixed(1)}%</p>
-                <p className="mt-2 text-sm">
+                <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>Nova parcela mensal</div>
+                <input type="number" min="0" style={inputStyle()} value={data.simulatedInstallment} onChange={(e) => update("simulatedInstallment", Number(e.target.value))} />
+              </div>
+              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                <StatBox label="Contas mensais atuais" value={currency(totalFixedExpenses)} />
+                <StatBox label="Nova parcela simulada" value={currency(data.simulatedInstallment)} />
+                <StatBox label="Novo total de contas" value={currency(totalSimulatedExpenses)} />
+                <StatBox label="Você separa por mês" value={currency(monthlyPlanContas)} />
+              </div>
+              <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14 }}>
+                <div style={{ fontSize: 13, color: "#64748b" }}>Impacto da simulação</div>
+                <div style={{ fontWeight: 700, marginTop: 6 }}>Cobertura das contas: {round2(contasCoverage).toFixed(1)}%</div>
+                <div style={{ marginTop: 8, fontSize: 14 }}>
                   {Number(data.simulatedInstallment) > 0
                     ? contasCoverage >= 100
                       ? "A nova parcela ainda cabe no plano atual."
                       : "A nova parcela quebra a cobertura das contas. Ajuste antes de comprar."
                     : "Digite um valor para testar uma compra parcelada antes de decidir."}
-                </p>
+                </div>
               </div>
-
               {Number(data.simulatedInstallment) > 0 && contasCoverage < 100 && (
-                <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4 space-y-3">
-                  <div>
-                    <p className="font-semibold text-yellow-800">Ajuste automático sugerido</p>
-                    <p className="mt-1 text-sm text-slate-700">Para a nova parcela caber, o sistema sugere subir <strong>Contas</strong> para {currency(suggestedWeeklyContas)} por semana.</p>
-                    <p className="mt-1 text-sm text-slate-700">Diferença necessária: <strong>{currency(contasShortfallWeekly)}</strong> por semana.</p>
-                  </div>
-                  <Button type="button" onClick={applySuggestedContasAdjustment}>Ajustar automaticamente o plano</Button>
+                <div style={{ background: "#fefce8", border: "1px solid #fde68a", borderRadius: 14, padding: 14, display: "grid", gap: 10 }}>
+                  <div style={{ fontWeight: 700, color: "#a16207" }}>Ajuste automático sugerido</div>
+                  <div style={{ fontSize: 14 }}>Para a nova parcela caber, o sistema sugere subir <strong>Contas</strong> para {currency(suggestedWeeklyContas)} por semana.</div>
+                  <div style={{ fontSize: 14 }}>Diferença necessária: <strong>{currency(contasShortfallWeekly)}</strong> por semana.</div>
+                  <button style={buttonStyle(true)} onClick={applySuggestedContasAdjustment}>Ajustar automaticamente o plano</button>
                 </div>
               )}
-            </div>
-          </SectionCard>
+            </Section>
 
-          <SectionCard title="Adicionar lançamento" id="full-lancar">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div className="space-y-2">
-                <Label>Natureza</Label>
-                <select className="w-full rounded-md border bg-white px-3 py-2" value={data.entryDraft.type} onChange={(e) => update("entryDraft.type", e.target.value)}>
-                  <option value="expense">Gasto</option>
-                  <option value="fixed">Conta Fixa</option>
-                </select>
+            <Section title="Adicionar lançamento" id="full-lancar">
+              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                <div>
+                  <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>Natureza</div>
+                  <select style={inputStyle()} value={data.entryDraft.type} onChange={(e) => update("entryDraft.type", e.target.value)}>
+                    <option value="expense">Gasto</option>
+                    <option value="fixed">Conta Fixa</option>
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>{data.entryDraft.type === "fixed" ? "Nome da conta" : "Nome do gasto"}</div>
+                  <input style={inputStyle()} value={data.entryDraft.name} onChange={(e) => update("entryDraft.name", e.target.value)} placeholder={data.entryDraft.type === "fixed" ? "Ex.: Internet" : "Ex.: Café"} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>Valor</div>
+                  <input type="number" min="0" style={inputStyle()} value={data.entryDraft.value} onChange={(e) => update("entryDraft.value", Number(e.target.value))} />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>{data.entryDraft.type === "fixed" ? "Nome da conta" : "Nome do gasto"}</Label>
-                <Input type="text" value={data.entryDraft.name} onChange={(e) => update("entryDraft.name", e.target.value)} placeholder={data.entryDraft.type === "fixed" ? "Ex.: Internet" : "Ex.: Café"} />
-              </div>
-              <div className="space-y-2">
-                <Label>Valor</Label>
-                <Input type="number" min="0" value={data.entryDraft.value} onChange={(e) => update("entryDraft.value", Number(e.target.value))} />
-              </div>
-            </div>
-            <Button className="w-full md:w-auto" onClick={addEntry}>Adicionar lançamento</Button>
-          </SectionCard>
+              <button style={{ ...buttonStyle(true), width: "100%" }} onClick={addEntry}>Adicionar lançamento</button>
+            </Section>
 
-          <SectionCard title="Contas Fixas Detalhadas" id="full-contas">
-            <details className="rounded-xl border bg-slate-50 p-4" open>
-              <summary className="cursor-pointer font-semibold text-slate-800">Contas cadastradas</summary>
-              <div className="mt-4 space-y-3">
-                {data.fixedAccounts.length === 0 ? (
-                  <p className="text-sm text-slate-500">Nenhuma conta fixa cadastrada.</p>
-                ) : (
-                  data.fixedAccounts.map((account) => (
-                    <div key={account.id} className="grid grid-cols-1 gap-3 rounded-xl border bg-white p-3 md:grid-cols-[1fr_140px_160px]">
-                      <div className="space-y-2">
-                        <Label>Nome da conta</Label>
-                        <Input type="text" value={account.name} onChange={(e) => updateFixedAccount(account.id, "name", e.target.value)} />
+            <Section title="Contas Fixas Detalhadas" id="full-contas">
+              {data.fixedAccounts.length === 0 ? (
+                <div style={{ color: "#64748b", fontSize: 14 }}>Nenhuma conta fixa cadastrada.</div>
+              ) : (
+                <div style={{ display: "grid", gap: 10 }}>
+                  {data.fixedAccounts.map((account) => (
+                    <div key={account.id} style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", border: "1px solid #e2e8f0", borderRadius: 14, background: "#fff", padding: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>Nome da conta</div>
+                        <input style={inputStyle()} value={account.name} onChange={(e) => updateFixedAccount(account.id, "name", e.target.value)} />
                       </div>
                       <div>
-                        <p className="text-sm text-slate-600">Valor mensal</p>
-                        <p className="font-semibold">{currency(account.value)}</p>
+                        <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>Valor mensal</div>
+                        <div style={{ ...inputStyle(), display: "flex", alignItems: "center", background: "#f8fafc" }}>{currency(account.value)}</div>
                       </div>
-                      <div className="space-y-2">
-                        <Label>Lançar gasto</Label>
-                        <Input type="number" min="0" value={account.spent} onChange={(e) => updateFixedAccount(account.id, "spent", Number(e.target.value))} />
+                      <div>
+                        <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>Lançar gasto</div>
+                        <input type="number" min="0" style={inputStyle()} value={account.spent} onChange={(e) => updateFixedAccount(account.id, "spent", Number(e.target.value))} />
                       </div>
                     </div>
-                  ))
-                )}
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <div className="rounded-xl bg-slate-100 p-4">
-                    <p className="text-sm text-slate-600">Total das contas fixas</p>
-                    <p className="font-bold">{currency(detailedFixedAccountsTotal)}</p>
-                  </div>
-                  <div className="rounded-xl bg-slate-100 p-4">
-                    <p className="text-sm text-slate-600">Total de gastos lançados</p>
-                    <p className="font-bold">{currency(totalFixedAccountsSpent)}</p>
-                  </div>
-                  <div className="rounded-xl bg-slate-100 p-4">
-                    <p className="text-sm text-slate-600">Restante das contas fixas</p>
-                    <p className="font-bold">{currency(totalFixedAccountsRemaining)}</p>
-                  </div>
+                  ))}
                 </div>
+              )}
+              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                <StatBox label="Total das contas fixas" value={currency(detailedFixedAccountsTotal)} />
+                <StatBox label="Total de gastos lançados" value={currency(totalFixedAccountsSpent)} />
+                <StatBox label="Restante das contas fixas" value={currency(totalFixedAccountsRemaining)} />
               </div>
-            </details>
-          </SectionCard>
+            </Section>
 
-          <SectionCard title="Gastos Detalhados" id="full-gastos">
-            <details className="rounded-xl border bg-slate-50 p-4" open>
-              <summary className="cursor-pointer font-semibold text-slate-800">Gastos cadastrados</summary>
-              <div className="mt-4 space-y-3">
-                {data.detailedExpenses.length === 0 ? (
-                  <p className="text-sm text-slate-500">Nenhum gasto detalhado adicionado.</p>
+            <Section title="Gastos Detalhados" id="full-gastos">
+              {data.detailedExpenses.length === 0 ? (
+                <div style={{ color: "#64748b", fontSize: 14 }}>Nenhum gasto detalhado adicionado.</div>
+              ) : (
+                <div style={{ display: "grid", gap: 10 }}>
+                  {data.detailedExpenses.map((expense) => (
+                    <div key={expense.id} style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", border: "1px solid #e2e8f0", borderRadius: 14, background: "#fff", padding: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>Nome do gasto</div>
+                        <input style={inputStyle()} value={expense.name} onChange={(e) => updateDetailedExpense(expense.id, "name", e.target.value)} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, color: "#64748b", marginBottom: 6 }}>Valor</div>
+                        <input type="number" min="0" style={inputStyle()} value={expense.value} onChange={(e) => updateDetailedExpense(expense.id, "value", Number(e.target.value))} />
+                      </div>
+                      <div style={{ display: "flex", alignItems: "end" }}>
+                        <button style={{ ...buttonStyle(false), width: "100%" }} onClick={() => removeDetailedExpense(expense.id)}>Remover</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                <StatBox label="Total dos gastos detalhados" value={currency(detailedExpensesTotal)} />
+                <StatBox label="Gasto efetivo da semana" value={currency(effectiveSpentSoFar)} />
+              </div>
+            </Section>
+
+            <Section title="Alertas Inteligentes dos Cofrinhos" id="full-alertas">
+              <div style={{ display: "grid", gap: 10 }}>
+                {intelligentAlerts.length === 0 ? (
+                  <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 14, padding: 14 }}>
+                    <div style={{ fontWeight: 700, color: "#15803d" }}>Nenhum alerta crítico no momento</div>
+                    <div style={{ fontSize: 14, marginTop: 6 }}>Seus cofrinhos principais estão coerentes com o plano atual.</div>
+                  </div>
                 ) : (
-                  data.detailedExpenses.map((expense) => (
-                    <div key={expense.id} className="grid grid-cols-1 gap-3 rounded-xl border bg-white p-3 md:grid-cols-[1fr_180px_100px]">
-                      <div className="space-y-2">
-                        <Label>Nome do gasto</Label>
-                        <Input type="text" value={expense.name} onChange={(e) => updateDetailedExpense(expense.id, "name", e.target.value)} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Valor</Label>
-                        <Input type="number" min="0" value={expense.value} onChange={(e) => updateDetailedExpense(expense.id, "value", Number(e.target.value))} />
-                      </div>
-                      <div className="flex items-end">
-                        <Button variant="outline" onClick={() => removeDetailedExpense(expense.id)} type="button" className="w-full">Remover</Button>
-                      </div>
+                  intelligentAlerts.map((alert) => (
+                    <div key={alert.title} style={{ borderRadius: 14, padding: 14, border: "1px solid #e2e8f0" }} className={`${alertBoxClass(alert.type)}`}>
+                      <div className={alertTitleClass(alert.type)} style={{ fontWeight: 700 }}>{alert.title}</div>
+                      <div style={{ fontSize: 14, marginTop: 6 }}>{alert.message}</div>
                     </div>
                   ))
                 )}
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="rounded-xl bg-slate-100 p-4">
-                    <p className="text-sm text-slate-600">Total dos gastos detalhados</p>
-                    <p className="font-bold">{currency(detailedExpensesTotal)}</p>
-                  </div>
-                  <div className="rounded-xl bg-slate-100 p-4">
-                    <p className="text-sm text-slate-600">Gasto efetivo da semana</p>
-                    <p className="font-bold">{currency(effectiveSpentSoFar)}</p>
-                  </div>
-                </div>
               </div>
-            </details>
-          </SectionCard>
-
-          <SectionCard title="Alertas Inteligentes dos Cofrinhos" id="full-alertas">
-            {intelligentAlerts.length === 0 ? (
-              <div className="rounded-xl border border-green-200 bg-green-50 p-4">
-                <p className="font-semibold text-green-700">Nenhum alerta crítico no momento</p>
-                <p className="mt-1 text-sm text-slate-700">Seus cofrinhos principais estão coerentes com o plano atual.</p>
+              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                <StatBox label="Status do cofrinho de contas" value={contasPiggyStatus} />
+                <StatBox label="Status do cofrinho de investimento" value={investimentoPiggyStatus} />
               </div>
-            ) : (
-              <div className="space-y-3">
-                {intelligentAlerts.map((alert) => (
-                  <div key={alert.title} className={`rounded-xl border p-4 ${alertBoxClass(alert.type)}`}>
-                    <p className={`font-semibold ${alertTitleClass(alert.type)}`}>{alert.title}</p>
-                    <p className="mt-1 text-sm text-slate-700">{alert.message}</p>
+            </Section>
+
+            <Section title="Visão dos Cofrinhos" id="full-cofrinhos">
+              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                {Object.entries(data.piggyBanks).map(([k, v]) => (
+                  <div key={k} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 10 }}>
+                      <div style={{ fontSize: 14, color: "#64748b", textTransform: "capitalize" }}>{k}</div>
+                      <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: "#64748b" }}>
+                        <input type="checkbox" checked={Boolean(data.piggyBankChecks?.[k])} onChange={(e) => update(`piggyBankChecks.${k}`, e.target.checked)} />
+                        Atualizado
+                      </label>
+                    </div>
+                    <input type="number" min="0" style={inputStyle()} value={v} onChange={(e) => update(`piggyBanks.${k}`, Number(e.target.value))} />
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 10 }}>
+                      <div style={{ fontWeight: 700 }}>{currency(v)}</div>
+                      <div style={{ padding: "6px 10px", borderRadius: 999, background: "#e2e8f0", fontSize: 12, fontWeight: 700 }}>{data.piggyBankChecks?.[k] ? "Conferido" : "Pendente"}</div>
+                    </div>
                   </div>
                 ))}
               </div>
-            )}
-
-            <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
-              <div className="rounded-xl bg-slate-100 p-4">
-                <p className="text-slate-600">Status do cofrinho de contas</p>
-                <p className="mt-1 font-bold">{contasPiggyStatus}</p>
+              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                <StatBox label="Total em todos os cofrinhos" value={currency(totalPiggyBanks)} />
+                <StatBox label="Falta para contas fecharem 1 mês" value={currency(Math.max(0, piggyContasGap))} color={piggyContasGap > 0 ? "#dc2626" : "#16a34a"} />
+                <StatBox label="Meta mínima sugerida em investimento" value={currency(monthlyInvestment)} />
               </div>
-              <div className="rounded-xl bg-slate-100 p-4">
-                <p className="text-slate-600">Status do cofrinho de investimento</p>
-                <p className="mt-1 font-bold">{investimentoPiggyStatus}</p>
-              </div>
-            </div>
-          </SectionCard>
+            </Section>
 
-          <SectionCard title="Visão dos Cofrinhos" id="full-cofrinhos">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {Object.entries(data.piggyBanks).map(([k, v]) => (
-                <div key={k} className="rounded-xl bg-slate-100 p-4 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm capitalize text-slate-600">{k}</p>
-                    <label className="flex items-center gap-2 text-xs text-slate-600">
-                      <input type="checkbox" checked={Boolean(data.piggyBankChecks?.[k])} onChange={(e) => update(`piggyBankChecks.${k}`, e.target.checked)} />
-                      Atualizado
-                    </label>
+            <Section title="Distribuição por Cofrinho" id="full-distribuicao">
+              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                {Object.entries(distributionTargets).map(([key, item]) => (
+                  <div key={key} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14 }}>
+                    <div style={{ fontSize: 14, color: "#64748b", textTransform: "capitalize", marginBottom: 8 }}>{key}</div>
+                    <div style={{ fontSize: 14 }}>Semanal: <strong style={{ color: "#16a34a" }}>{currency(item.weekly)}</strong></div>
+                    <div style={{ fontSize: 14, marginTop: 4 }}>Mensal: <strong>{currency(item.monthly)}</strong></div>
+                    <div style={{ fontSize: 14, marginTop: 4 }}>Saldo atual: <strong>{currency(item.current)}</strong></div>
                   </div>
-                  <Input type="number" min="0" value={v} onChange={(e) => update(`piggyBanks.${k}`, Number(e.target.value))} />
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-bold">{currency(v)}</p>
-                    <Badge>{data.piggyBankChecks?.[k] ? "Conferido" : "Pendente"}</Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+              <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                <StatBox label="Total da distribuição semanal" value={currency(distributionSummary.weekly)} />
+                <StatBox label="Total da distribuição mensal" value={currency(distributionSummary.monthly)} />
+              </div>
+            </Section>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div className="rounded-xl bg-slate-100 p-4">
-                <p className="text-sm text-slate-600">Total em todos os cofrinhos</p>
-                <p className="font-bold">{currency(totalPiggyBanks)}</p>
-              </div>
-              <div className="rounded-xl bg-slate-100 p-4">
-                <p className="text-sm text-slate-600">Falta para contas fecharem 1 mês</p>
-                <p className={`font-bold ${piggyContasGap > 0 ? "text-red-600" : "text-green-700"}`}>{currency(Math.max(0, piggyContasGap))}</p>
-              </div>
-              <div className="rounded-xl bg-slate-100 p-4">
-                <p className="text-sm text-slate-600">Meta mínima sugerida em investimento</p>
-                <p className="font-bold">{currency(monthlyInvestment)}</p>
-              </div>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Distribuição por Cofrinho" id="full-distribuicao">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {Object.entries(distributionTargets).map(([key, item]) => (
-                <div key={key} className="rounded-xl border bg-slate-50 p-4">
-                  <p className="text-sm capitalize text-slate-600">{key}</p>
-                  <p className="mt-2 text-sm">Semanal: <strong className="text-green-600">{currency(item.weekly)}</strong></p>
-                  <p className="text-sm">Mensal: <strong>{currency(item.monthly)}</strong></p>
-                  <p className="text-sm">Saldo atual: <strong>{currency(item.current)}</strong></p>
-                </div>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="rounded-xl bg-slate-100 p-4">
-                <p className="text-sm text-slate-600">Total da distribuição semanal</p>
-                <p className="font-bold">{currency(distributionSummary.weekly)}</p>
-              </div>
-              <div className="rounded-xl bg-slate-100 p-4">
-                <p className="text-sm text-slate-600">Total da distribuição mensal</p>
-                <p className="font-bold">{currency(distributionSummary.monthly)}</p>
-              </div>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Investimento" id="full-investimento">
-            <div className="rounded-xl bg-slate-100 p-4">
-              <p>Você investe por mês:</p>
-              <p className="font-bold">{currency(monthlyInvestment)}</p>
-            </div>
-          </SectionCard>
-        </>
-      )}
+            <Section title="Investimento" id="full-investimento">
+              <StatBox label="Você investe por mês" value={currency(monthlyInvestment)} />
+            </Section>
+          </>
+        )}
+      </div>
     </div>
   );
 }
