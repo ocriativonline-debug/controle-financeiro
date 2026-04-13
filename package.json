@@ -1,0 +1,7 @@
+{
+  "name": "controle-financeiro",
+  "private": true,
+  "scripts": {
+    "build": "echo build ok"
+  }
+}
